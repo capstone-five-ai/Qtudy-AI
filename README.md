@@ -5,16 +5,21 @@ pip install flask
 pip install openai
 pip install tiktoken
 pip install Pillow
-pip install easyocr // 서버리소스 부족으로  swap 파일 생성해야함.
+pip install easyocr 
 pip install opencv-python
 
 
 
+# 파이썬 플라스크 실행
+일반 실행 : python3 nocr_gpt.py
+백그라운드실행 : nohup python3 nocr_gpt.py &
 
 
 
 
-#SWAP 파일 생성 
+
+
+#SWAP 파일 생성  (disk 공간 부족으로 생략)
 sudo fallocate -l 4G /swapfile
 
 
