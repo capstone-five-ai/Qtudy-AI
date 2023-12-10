@@ -12,7 +12,7 @@ from io import BytesIO
 app = Flask(__name__)
 
 # OpenAI API Key 환경변수 설정해야함 (github에 key 올라가면 key 막힘)
-openai.api_key = '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'
+#openai.api_key 
 
 MAX_TOKEN = 1000
 
