@@ -12,7 +12,7 @@ from io import BytesIO
 app = Flask(__name__)
 
 # OpenAI API Key 환경변수 설정해야함 (github에 key 올라가면 key 막힘)
-#openai.api_key
+openai.api_key = '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'
 
 MAX_TOKEN = 1000
 
@@ -147,13 +147,13 @@ def prompt1():
                 # top_p= 0.7,
                 # frequency_penalty= 1,
                 # presence_penalty= 0.8,
-                max_tokens= 2048
+                max_tokens= 1024
                 )
 
             gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
             gpt_response['problemChoices'] = list(gpt_response ['problemChoices'].values())
             ai_mcq_response_list.append(AiResponseDto(problemName=gpt_response['problemName'], 
-            problemChoices=gpt_response['problemChoices'], problemAnswer= (gpt_response['problemAnswer']),  problemCommentary=gpt_response['problemCommentary']))
+            problemChoices=gpt_response['problemChoices'], problemAnswer= gpt_response['problemAnswer'],  problemCommentary=gpt_response['problemCommentary']))
 
         mcq_json_response = [
             {
@@ -238,7 +238,7 @@ def prompt2():
                 # top_p= 0.7,
                 # frequency_penalty= 1,
                 # presence_penalty= 0.8,
-                max_tokens= 2048
+                max_tokens= 1024
                 )
             gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
             ai_saq_response_list.append(AiResponseDto(problemName = gpt_response['problemName'], 
@@ -318,7 +318,7 @@ def prompt3():
                 # top_p= 0.7,
                 # frequency_penalty= 1,
                 # presence_penalty= 0.8,
-                max_tokens= 2048
+                max_tokens= 1024
                 )
             gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
             
@@ -406,9 +406,9 @@ def prompt4():
         difficulty=difficulty_rq
         )
            
-        if ai_mcq_img_dto.amount == "MANY" : MAX_TOKEN= 300
-        elif ai_mcq_img_dto.amount== "MEDIUM" : MAX_TOKEN = 450
-        elif  ai_mcq_img_dto.amount == "FEW" : MAX_TOKEN = 550
+        if ai_mcq_img_dto.amount == "MANY" : MAX_TOKEN= 400
+        elif ai_mcq_img_dto.amount== "MEDIUM" : MAX_TOKEN = 500
+        elif  ai_mcq_img_dto.amount == "FEW" : MAX_TOKEN = 600
 
         if ai_mcq_img_dto.difficulty == "HARD" :ai_mcq_img_dto.difficulty = "어려운"
         elif ai_mcq_img_dto.difficulty == "MODERATE" : ai_mcq_img_dto.difficulty = "basic한"
@@ -454,13 +454,13 @@ def prompt4():
                 # top_p= 0.7,
                 # frequency_penalty= 1,
                 # presence_penalty= 0.8,
-                max_tokens= 2048
+                max_tokens= 1024
                 )
 
             gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
             gpt_response['problemChoices'] = list(gpt_response ['problemChoices'].values())
             ai_mcq_img_list.append(AiResponseDto(problemName=gpt_response['problemName'], 
-            problemChoices=gpt_response['problemChoices'], problemAnswer= (gpt_response['problemAnswer']),  problemCommentary=gpt_response['problemCommentary']))
+            problemChoices=gpt_response['problemChoices'], problemAnswer= gpt_response['problemAnswer'],  problemCommentary=gpt_response['problemCommentary']))
 
         mcq_json_response = [
             {
@@ -491,9 +491,10 @@ def prompt5():
                 difficulty=difficulty_rq
              )
 
-        if ai_saq_img_dto.amount == "MANY" : MAX_TOKEN = 300
+        if ai_saq_img_dto.amount == "MANY" : MAX_TOKEN = 400
         elif ai_saq_img_dto.amount== "MEDIUM" : MAX_TOKEN = 500
         elif  ai_saq_img_dto.amount == "FEW" : MAX_TOKEN = 600
+
 
         if ai_saq_img_dto.difficulty == "HARD" : ai_saq_img_dto.difficulty = "어려운"
         elif ai_saq_img_dto.difficulty == "MODERATE" : ai_saq_img_dto.difficulty = "basic한"
@@ -562,7 +563,7 @@ def prompt5():
                 # top_p= 0.7,
                 # frequency_penalty= 1,
                 # presence_penalty= 0.8,
-                max_tokens= 2048
+                max_tokens= 1024
                 )
             gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
             ai_saq_img_list.append(AiResponseDto(problemName = gpt_response['problemName'], 
@@ -588,6 +589,7 @@ class AiSummaryJPGDto: #요점정리 input
 
 @app.route('/create/summary/jpg', methods=['POST']) #이미지 요점정리
 def prompt6():
+    try:
         amount_rq = request.form.get('amount')
         img_files = request.files.getlist('files')
         
@@ -609,7 +611,7 @@ def prompt6():
             files=img_files,
             amount=amount_rq
         )
-        if  ai_img_summary_dto.amount == "MANY" : MAX_TOKEN = 300
+        if  ai_img_summary_dto.amount == "MANY" : MAX_TOKEN = 400
         elif  ai_img_summary_dto.amount== "MEDIUM" : MAX_TOKEN = 500
         elif   ai_img_summary_dto.amount == "FEW" : MAX_TOKEN = 600
 
@@ -653,7 +655,7 @@ def prompt6():
                 # top_p= 0.7,
                 # frequency_penalty= 1,
                 # presence_penalty= 0.8,
-                max_tokens= 2048
+                max_tokens= 1024
                 )
             gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
             
@@ -672,6 +674,8 @@ def prompt6():
             summary_jpg_result = {"summaryContent" : merged_json}
         return jsonify(summary_jpg_result)
 
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 
 if __name__ == '__main__':
