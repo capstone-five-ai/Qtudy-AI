@@ -1,5 +1,6 @@
 # Qtudy-AI 환경설정
 
+apt install python-pip
 sudo apt install python3-pip3
 pip install flask
 pip install openai
