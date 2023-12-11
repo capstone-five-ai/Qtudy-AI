@@ -22,7 +22,10 @@ pip install opencv-python
 
 
 # SWAP 파일 생성  (disk 공간 부족으로 생략)
-sudo fallocate -l 4G /swapfile
+sudo fallocate -l 4G /swapfile  # 스왑 파일 생성 (4GB)
+sudo chmod 600 /swapfile        # 권한 설정
+sudo mkswap /swapfile            # 스왑 파일 형식 지정
+sudo swapon /swapfile            # 스왑 파일 활성화
 
 
 
