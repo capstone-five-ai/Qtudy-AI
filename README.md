@@ -1,5 +1,10 @@
 # Qtudy-AI 환경설정
 
+
+sudo add-apt-repository ppa:deadsnakes/ppa
+sudo apt-get update
+sudo apt-get install python3.8 # 3.8이상
+
 apt install python-pip
 sudo apt install python3-pip3
 pip install flask
