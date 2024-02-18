@@ -1,35 +1,63 @@
 from flask import Flask, request, jsonify
 import openai
+import tiktoken
+import json
 from PIL import Image
-import io
-import matplotlib.pyplot as plt
+from flask import Flask, request
+import easyocr
+import cv2
+import numpy as np
+from PIL import Image
+from io import BytesIO
 
 app = Flask(__name__)
 
 # OpenAI API Key 환경변수 설정해야함 (github에 key 올라가면 key 막힘)
-#openai.api_key
+openai.api_key = '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'
+
+MAX_TOKEN = 1000
+
+
+
+
+def count_tokens(text):
+    tokenizer = tiktoken.get_encoding("cl100k_base")
+    tokenizer = tiktoken.encoding_for_model("gpt-3.5-turbo") 
+    
+    return len(tokenizer.encode(text))
+
+def split_token(text, token_limit):
+    characters = list(text)
+
+    current_text = ""
+    texts = []
+
+    for char in characters:
+        current_text += char
+        if count_tokens(current_text) >= token_limit:
+            texts.append(current_text)
+            current_text = ""
+
+    if current_text:
+        texts.append(current_text)
+
+    return texts
+
 
 
 class AiProblemDto: #문제 input
-    def __init__(self, text, type, amount, difficulty):
+    def __init__(self, text, amount, difficulty):
         self.text = text
-        self.type = type
         self.amount = amount
         self.difficulty = difficulty
+    
 
 class AiResponseDto: #문제 output
-    def __init__(self, problemName, problemCommentary,problemAnswer=None,problemChoices = None):
-        self.problemName = problemName
+    def __init__(self, problemName, problemCommentary, problemAnswer, problemChoices = None):
+        self.problemName = problemName #문제
         self.problemChoices = problemChoices #객관식은 있어야하고, 주관식은 없어도 됨
         self.problemAnswer = problemAnswer
         self.problemCommentary = problemCommentary
-
-class AiProblemByJpgDto: #문제 input
-    def __init__(self, text, type, amount, difficulty):
-        self.text = text
-        self.type = type
-        self.amount = amount
-        self.difficulty = difficulty
         
          
 
@@ -37,356 +65,643 @@ class AiProblemByJpgDto: #문제 input
 def prompt1():
     try:
         data = request.json
-
-        # Assuming your JSON format is similar to the AiProblemDto structure
-        ai_problem_dto = AiProblemDto(
-            text=data.get('text'),
-            type=data.get('type'),
-            amount=data.get('amount'),
-            difficulty=data.get('difficulty')
+        problem_mcq = {
+        "type": "object",
+        "properties": {
+            "problemName": {
+            "type": "string",
+            "description": "의문문 형식의 문제명"
+            },
+            "problemChoices": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "option의 갯수는 무조건 4개이어야 해",
+                "properties": { 
+                "1": {
+                    "type": "string",
+                    "description": "The OPTION A of the question.",
+                },
+                "2": {
+                    "type": "string",
+                    "description": "The OPTION B of the question.",
+                },
+                "3": {
+                    "type": "string",
+                    "description": "The OPTION C of the question.",
+                },
+                "4": {
+                    "type": "string",
+                    "description": "The OPTION D of the question.",
+                },
+                },
+                "required": ["1", "2", "3", "4"]
+            }
+            },
+            "problemAnswer": {
+            "type": "string",
+            "description": "선지에서 하나의 정답만 골라줘"
+            },
+            "problemCommentary": {
+            "type": "string",
+            "description": "문제의 정답에 대한 해설을 알려줘"
+            },
+        },
+        "required": ["problemName", "problemChoices", "problemAnswer", "problemCommentary"]
+        }
+       
+        ai_mcq_problem_dto = AiProblemDto(
+        text=data.get('text'),
+        amount=data.get('amount'),
+        difficulty=data.get('difficulty')
         )
+           
+        if ai_mcq_problem_dto.amount == "MANY" : MAX_TOKEN= 300
+        elif ai_mcq_problem_dto.amount== "MEDIUM" : MAX_TOKEN = 450
+        elif  ai_mcq_problem_dto.amount == "FEW" : MAX_TOKEN = 550
 
-        # Now you can use ai_problem_dto to create your prompt
-        prompt = ai_problem_dto.text + "라는 내용을 기반으로 객관식 문제를 만들어줘"
-        messages_p = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-        print(prompt)
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages_p,
-        )
+        if ai_mcq_problem_dto.difficulty == "HARD" : ai_mcq_problem_dto.difficulty = "어려운"
+        elif ai_mcq_problem_dto.difficulty == "MODERATE" : ai_mcq_problem_dto.difficulty = "basic한"
+        elif ai_mcq_problem_dto.difficulty == "EASY" : ai_mcq_problem_dto.difficulty = "쉬운"
+        ai_mcq_response_list =[]
         
-        # Create a list of AiResponseDto instances
-        ai_response_list = [
-            AiResponseDto(
-                problemName="문제 제목1",
-                problemChoices=["보기 1", "보기 2", "보기 3"],
-                problemAnswer="2",
-                problemCommentary="문제 해설 1"
-            ),
-            AiResponseDto(
-                problemName="문제 제목2",
-                problemChoices=["보기 1", "보기 2", "보기 3"],
-                problemAnswer="3",
-                problemCommentary="문제 해설 2"
-            ),
-            # Add more items to the list if needed
-        ]
+        text_chunks = split_token(ai_mcq_problem_dto.text, MAX_TOKEN)
+        for i in range(len(text_chunks)):
+            prompt = "' " +text_chunks[i] + f"'의 내용기반으로 {ai_mcq_problem_dto.difficulty} 객관식 문제 만들어줘 "
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo-0613",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "너는 내용을 입력받으면 그 내용을 기반으로 객관식 문제를 만들어주는 시스템이야. 단 문제를 영어로 만들지 않고 한글로 문제를 만들어야 돼"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                functions=[{
+                    "name": "get_new_quiz",
+                    "description": "요청한 내용을 기반으로 객관식 문제 만들어줘 빈칸이 있으면 안돼",
+                    "parameters": problem_mcq
+                }],
+                function_call={
+                    "name": "get_new_quiz"
+                },
+                # temperature= 1.1,
+                # top_p= 0.7,
+                # frequency_penalty= 1,
+                # presence_penalty= 0.8,
+                max_tokens= 1024
+                )
 
-        # Convert the list to a JSON response
-        json_response = [
+            gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
+            gpt_response['problemChoices'] = list(gpt_response ['problemChoices'].values())
+            ai_mcq_response_list.append(AiResponseDto(problemName=gpt_response['problemName'], 
+            problemChoices=gpt_response['problemChoices'], problemAnswer= gpt_response['problemAnswer'],  problemCommentary=gpt_response['problemCommentary']))
+
+        mcq_json_response = [
             {
                 "problemName": item.problemName,
                 "problemChoices": item.problemChoices,
                 "problemAnswer": item.problemAnswer,
                 "problemCommentary": item.problemCommentary
             }
-            for item in ai_response_list
-        ]
-        print(json_response)
+            for item in ai_mcq_response_list ]
+       
+        print(mcq_json_response)
 
-        return jsonify(json_response)
-
+        return jsonify(mcq_json_response)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
-    
-    
-    
-    
-        
+         return jsonify({"error": str(e)}), 400
     
     
     
 @app.route('/create/problem/saq', methods=['POST']) #주관식
-def prompt3():
-        data = request.json
-
-        # Assuming your JSON format is similar to the AiProblemDto structure
-        ai_problem_dto = AiProblemDto(
-            text=data.get('text'),
-            type=data.get('type'),
-            amount=data.get('amount'),
-            difficulty=data.get('difficulty')
+def prompt2():
+    try:
+        saq_data = request.json
+        ai_saq_response_list = []
+        ai_saq_problem_dto = AiProblemDto(
+            text=saq_data.get('text'),
+            amount=saq_data.get('amount'),
+            difficulty=saq_data.get('difficulty')
         )
 
-        # Now you can use ai_problem_dto to create your prompt
-        prompt = ai_problem_dto.text + "라는 내용을 기반으로 주관식 문제를 만들어줘"
-        messages_p = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-        print(prompt)
+        if ai_saq_problem_dto.amount == "MANY" : MAX_TOKEN = 300
+        elif ai_saq_problem_dto.amount== "MEDIUM" : MAX_TOKEN = 500
+        elif  ai_saq_problem_dto.amount == "FEW" : MAX_TOKEN = 600
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages_p,
-        )
+        if ai_saq_problem_dto.difficulty == "HARD" : ai_saq_problem_dto.difficulty = "어려운"
+        elif ai_saq_problem_dto.difficulty == "MODERATE" : ai_saq_problem_dto.difficulty = "basic한"
+        elif ai_saq_problem_dto.difficulty == "EASY" : ai_saq_problem_dto.difficulty = "쉬운"
+
+        problem_saq = {
+        "type": "object",
+        "properties": {
+            "problemName": {
+            "type": "string",
+            "description": "의문문 형식의 문제명"
+            },
+            "problemAnswer": {
+            "type": "string",
+            "description": "문제에 대한 정답"
+            },
+            "problemCommentary": {
+            "type": "string",
+            "description": "문제의 정답에 대한 해설"
+            },
+        },
+        "required": ["problemName", "problemAnswer", "problemCommentary"]
+        }
+
+        ai_saq_response_list =[]
+
+        # 텍스트를 토큰 제한에 맞게 분리
+        text_chunks = split_token(ai_saq_problem_dto.text, MAX_TOKEN)
+
+
+        for i in range(len(text_chunks)):
+            prompt = "' " +text_chunks[i] + f"'의 내용기반으로 {ai_saq_problem_dto.difficulty} 주관식 문제 만들어줘 "
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo-0613",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "너는 내용을 입력받으면 그 내용을 기반으로 주관식 문제를 만들어주는 시스템이야. 단 문제를 영어로 만들지 않고 한글로 문제를 만들어야 돼"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                functions=[{
+                    "name": "get_new_quiz",
+                    "description": "요청한 내용을 기반으로 문제 만들어줘 빈칸이 있으면 안돼",
+                    "parameters": problem_saq
+                }],
+                function_call={
+                    "name": "get_new_quiz"
+                },
+                # temperature= 1.1,
+                # top_p= 0.7,
+                # frequency_penalty= 1,
+                # presence_penalty= 0.8,
+                max_tokens= 1024
+                )
+            gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
+            ai_saq_response_list.append(AiResponseDto(problemName = gpt_response['problemName'], 
+                        problemAnswer = gpt_response['problemAnswer'],  problemCommentary = gpt_response['problemCommentary']))
         
-        # Create a list of AiResponseDto instances
-        ai_response_list = [
-            AiResponseDto(
-                problemName="문제 제목1",
-                problemCommentary="문제 해설1"
-            ),
-            AiResponseDto(
-                problemName="문제 제목2",
-                problemCommentary="문제 해설2"
-            ),
-            AiResponseDto(
-                problemName="문제 제목3",
-                problemCommentary="문제 해설3"
-            ),
-            AiResponseDto(
-                problemName="문제 제목4",
-                problemCommentary="문제 해설4"
-            ),
-            AiResponseDto(
-                problemName="문제 제목5",
-                problemCommentary="문제 해설5"
-            ),
-            AiResponseDto(
-                problemName="문제 제목6",
-                problemCommentary="문제 해설6"
-            ),
-            # Add more items to the list if needed
-        ]
+        saq_json_response = [
+                    {
+                        "problemName": item.problemName,
+                        "problemAnswer": item.problemAnswer,
+                        "problemCommentary": item.problemCommentary
+                    }
+                    for item in ai_saq_response_list ]  
+        
+        return jsonify(saq_json_response)
+    except Exception as e:
+         return jsonify({"error": str(e)}), 400
+    
 
-        # Convert the list to a JSON response
-        json_response = [
-            {
-                "problemName": item.problemName,
-                "problemChoices": item.problemChoices,
-                "problemCommentary": item.problemCommentary
-            }
-            for item in ai_response_list
-        ]
-        print(json_response)
-
-        return jsonify(json_response)
-
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
 class AiSummaryDto: #요점정리 input
-     def __init__(self, text, amount, fileName):
+     def __init__(self, text, amount):
          self.text = text
          self.amount = amount
-         self.fileName = fileName
          
     
 class AiSummaryResponseDto: #요점정리 output
-     def __init__(self, summaryTitle, summaryContent,fileName):
-         self.summaryTitle= summaryTitle
+     def __init__(self, summaryContent):
          self.summaryContent = summaryContent    
-         self.fileName = fileName
-
 
 @app.route('/create/summary', methods=['POST']) #요점정리
-def prompt4():
+def prompt3():
     try:
         data = request.json
+        ai_response_list = []
+        
+        summary_schema = {
+        "type": "object",
+        "properties": {
+            "summaryContent": {
+            "type": "string",
+            "description": "요점정리 내용"
+            }
+        },
+        "required": ["summaryContent"]
+        }
 
-        # Assuming your JSON format is similar to the AiProblemDto structure
+
         ai_summary_dto = AiSummaryDto(
             text=data.get('text'),
             amount=data.get('amount'),
-            fileName=data.get('fileName')
         )
+        if ai_summary_dto.amount == "MANY" : MAX_TOKEN = 300
+        elif ai_summary_dto.amount== "MEDIUM" : MAX_TOKEN = 500
+        elif  ai_summary_dto.amount == "FEW" : MAX_TOKEN = 600
 
-        # Now you can use ai_problem_dto to create your prompt
-        prompt = ai_summary_dto.text + "라는 내용을 기반으로 요점정리를 만들어줘"
-        messages_p = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-        print(prompt)
+        text_chunks = split_token(ai_summary_dto.text, MAX_TOKEN)
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages_p,
-        )
-        
-        # Create a list of AiResponseDto instances
-        ai_response = AiSummaryResponseDto(
-            summaryTitle="요점정리 제목",
-            summaryContent="요점정리",
-            fileName="파일이름"
-        )
 
-        # Convert the list to a JSON response
-        json_response = {
-            "summaryTitle": ai_response.summaryTitle,
-            "summaryContent": ai_response.summaryContent,
-            "fileName": ai_response.fileName
-        }
+        for i in range(len(text_chunks)):
+            prompt = "' " +text_chunks[i] + f"'의 내용기반으로 요점 정리 해줘 "
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo-0613",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "너는 내용을 입력받으면 그 내용을 기반으로 요점정리를 만들어주는 시스템이야. 단 요점정리를 영어로 만들지 않고 한글로 만들어야 돼"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                functions=[{
+                    "name": "summary",
+                    "description": "요청한 내용을 기반으로 요점 정리해줘",
+                    "parameters": summary_schema
+                }],
+                function_call={
+                    "name": "summary"
+                },
+                # temperature= 1.1,
+                # top_p= 0.7,
+                # frequency_penalty= 1,
+                # presence_penalty= 0.8,
+                max_tokens= 1024
+                )
+            gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
+            
+            gpt_response['summaryContent'] = ' '.join(gpt_response['summaryContent'].split('\n'))
+            ai_response_list.append(AiSummaryResponseDto(summaryContent = gpt_response['summaryContent']))
 
-        print(json_response)
-
-        return jsonify(json_response)
+            # Check the result
+            json_response = [
+                {
+                    "summaryContent": item.summaryContent
+                }
+                for item in ai_response_list
+            ]
+            merged_json = " ".join(item["summaryContent"] for item in json_response)
+            summary_result = {"summaryContent" : merged_json}
+        return jsonify(summary_result)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-    
 
+
+
+
+# 이미지 
 class AiGenerateProblemByFileDto:
-    def __init__(self, type, amount, difficulty, files):
-        self.type = type
+    def __init__(self, files, amount, difficulty):
         self.amount = amount
         self.difficulty = difficulty
         self.files = files    
         
-@app.route('/create/problem/mcq/jpg', methods=['POST']) #객관식
-def prompt2():
-
-        # Assuming your JSON format is similar to the AiProblemDto structure
-        ai_problem_dto = AiGenerateProblemByFileDto(
-            files=request.files.get('files'),
-            type=request.values.get('type'),
-            amount=request.values.get('amount'),
-            difficulty=request.values.get('difficulty')
+@app.route('/create/problem/mcq/jpg', methods=['POST']) #이미지 객관식
+def prompt4():
+    try:
+        amount_rq = request.form.get('amount')
+        difficulty_rq = request.form.get('difficulty')
+        img_files = request.files.getlist('files')
+        problem_mcq = {
+        "type": "object",
+        "properties": {
+            "problemName": {
+            "type": "string",
+            "description": "의문문 형식의 문제명"
+            },
+            "problemChoices": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "description": "option의 갯수는 무조건 4개이어야 해",
+                "properties": { 
+                "1": {
+                    "type": "string",
+                    "description": "The OPTION A of the question.",
+                },
+                "2": {
+                    "type": "string",
+                    "description": "The OPTION B of the question.",
+                },
+                "3": {
+                    "type": "string",
+                    "description": "The OPTION C of the question.",
+                },
+                "4": {
+                    "type": "string",
+                    "description": "The OPTION D of the question.",
+                },
+                },
+                "required": ["1", "2", "3", "4"]
+            }
+            },
+            "problemAnswer": {
+            "type": "string",
+            "description": "선지에서 하나의 정답만 골라줘"
+            },
+            "problemCommentary": {
+            "type": "string",
+            "description": "문제의 정답에 대한 해설을 알려줘"
+            },
+        },
+        "required": ["problemName", "problemChoices", "problemAnswer", "problemCommentary"]
+        }
+       
+        ai_mcq_img_dto = AiGenerateProblemByFileDto(
+        files = img_files,
+        amount= amount_rq,
+        difficulty=difficulty_rq
         )
+           
+        if ai_mcq_img_dto.amount == "MANY" : MAX_TOKEN= 400
+        elif ai_mcq_img_dto.amount== "MEDIUM" : MAX_TOKEN = 500
+        elif  ai_mcq_img_dto.amount == "FEW" : MAX_TOKEN = 600
+
+        if ai_mcq_img_dto.difficulty == "HARD" :ai_mcq_img_dto.difficulty = "어려운"
+        elif ai_mcq_img_dto.difficulty == "MODERATE" : ai_mcq_img_dto.difficulty = "basic한"
+        elif ai_mcq_img_dto.difficulty == "EASY" : ai_mcq_img_dto.difficulty = "쉬운"
         
-        #for uploaded_file in ai_problem_dto.files:
-        # 파일의 이름을 출력하고 저장하거나 원하는 작업을 수행할 수 있습니다.
-            #print(uploaded_file.filename)
-            #uploaded_file.save(f"uploads/{uploaded_file.filename}")
-        #print(ai_problem_dto.type)
+        ocr_result_list = []
+        reader = easyocr.Reader(['ko','en'], gpu=False)
+        print("num of img")
+        print(len(ai_mcq_img_dto.files))
+        print("ai_mcq_img_dto.amount : "+ai_mcq_img_dto.amount)
+        print("ai_mcq_img_dto.difficulty  : "+ ai_mcq_img_dto.difficulty)
+        for file in ai_mcq_img_dto.files:
+            image = Image.open(BytesIO(file.read()))
+            image = np.array(image)
+            ocr_result = reader.readtext(image, detail=0)
+            result_merge = ' '.join(ocr_result)
+            ocr_result_list.append(result_merge)
+   
+        result_text = ' '.join(ocr_result_list) 
         
-        print(ai_problem_dto.files)
-        print(AiGenerateProblemByFileDto)
+        ai_mcq_img_list =[]
         
-        file_bytes = ai_problem_dto.files.read()
+        text_chunks = split_token(result_text, MAX_TOKEN)
+        for i in range(len(text_chunks)):
+            prompt = "' " +text_chunks[i] + f"'의 내용기반으로 {ai_mcq_img_dto.difficulty} 객관식 문제 만들어줘 "
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo-0613",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "너는 내용을 입력받으면 그 내용을 기반으로 객관식 문제를 만들어주는 시스템이야. 단 문제를 영어로 만들지 않고 한글로 문제를 만들어야 돼"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                functions=[{
+                    "name": "get_new_quiz",
+                    "description": "요청한 내용을 기반으로 객관식 문제 만들어줘 빈칸이 있으면 안돼",
+                    "parameters": problem_mcq
+                }],
+                function_call={
+                    "name": "get_new_quiz"
+                },
+                # temperature= 1.1,
+                # top_p= 0.7,
+                # frequency_penalty= 1,
+                # presence_penalty= 0.8,
+                max_tokens= 1024
+                )
 
-        # 바이트를 PIL Image로 변환
-        image = Image.open(io.BytesIO(file_bytes))
-        plt.imshow(image)
-        plt.axis('on')  # 축을 표시할지 여부
-        plt.show()
-    
+            gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
+            gpt_response['problemChoices'] = list(gpt_response ['problemChoices'].values())
+            ai_mcq_img_list.append(AiResponseDto(problemName=gpt_response['problemName'], 
+            problemChoices=gpt_response['problemChoices'], problemAnswer= gpt_response['problemAnswer'],  problemCommentary=gpt_response['problemCommentary']))
 
-
-
-        # Now you can use ai_problem_dto to create your prompt
-        prompt = "라는 내용을 기반으로 객관식 문제를 만들어줘"
-        messages_p = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-        print(prompt)
-
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages_p,
-        )
-        
-        # Create a list of AiResponseDto instances
-        ai_response_list = [
-            AiResponseDto(
-                problemName="문제 제목1",
-                problemChoices=["보기 1", "보기 2", "보기 3"],
-                problemAnswer="2",
-                problemCommentary="문제 해설 1"
-            ),
-            AiResponseDto(
-                problemName="문제 제목2",
-                problemChoices=["보기 1", "보기 2", "보기 3"],
-                problemAnswer="3",
-                problemCommentary="문제 해설 2"
-            ),
-            # Add more items to the list if needed
-        ]
-
-        # Convert the list to a JSON response
-        json_response = [
+        mcq_json_response = [
             {
                 "problemName": item.problemName,
                 "problemChoices": item.problemChoices,
                 "problemAnswer": item.problemAnswer,
                 "problemCommentary": item.problemCommentary
             }
-            for item in ai_response_list
-        ]
-        print(json_response)
+            for item in ai_mcq_img_list ]
+       
+        print(mcq_json_response)
 
-        return jsonify(json_response)
-
-
-
-class AiSummaryJPGDto: #요점정리 input
-     def __init__(self, files, amount, fileName):
-         self.files = files
-         self.amount = amount
-         self.fileName = fileName
-         
+        return jsonify(mcq_json_response)
+    except Exception as e:
+         return jsonify({"error": str(e)}), 400
     
-
-
-@app.route('/create/summary/jpg', methods=['POST']) #요점정리
+# 이미지 주관식
+@app.route('/create/problem/saq/jpg', methods=['POST']) 
 def prompt5():
     try:
-        data = request.form.to_dict()
+        amount_rq = request.form.get('amount')
+        difficulty_rq = request.form.get('difficulty')
+        img_files = request.files.getlist('files')
 
-        # Assuming your JSON format is similar to the AiProblemDto structure
-        ai_summary_dto = AiSummaryJPGDto(
-            files=data.get('files'),
-            amount=data.get('amount'),
-            fileName=data.get('fileName')
-        )
+        ai_saq_img_dto = AiGenerateProblemByFileDto(
+                files = img_files,
+                amount= amount_rq,
+                difficulty=difficulty_rq
+             )
 
-        # Now you can use ai_problem_dto to create your prompt
-        prompt = "라는 내용을 기반으로 요점정리를 만들어줘"
-        messages_p = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": prompt},
-        ]
-        print(prompt)
+        if ai_saq_img_dto.amount == "MANY" : MAX_TOKEN = 400
+        elif ai_saq_img_dto.amount== "MEDIUM" : MAX_TOKEN = 500
+        elif  ai_saq_img_dto.amount == "FEW" : MAX_TOKEN = 600
 
-        response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=messages_p,
-        )
-        
-        # Create a list of AiResponseDto instances
-        ai_response = AiSummaryResponseDto(
-            summaryTitle="요점정리 제목",
-            summaryContent="요점정리",
-            fileName="파일이름"
-        )
 
-        # Convert the list to a JSON response
-        json_response = {
-            "summaryTitle": ai_response.summaryTitle,
-            "summaryContent": ai_response.summaryContent,
-            "fileName": ai_response.fileName
+        if ai_saq_img_dto.difficulty == "HARD" : ai_saq_img_dto.difficulty = "어려운"
+        elif ai_saq_img_dto.difficulty == "MODERATE" : ai_saq_img_dto.difficulty = "basic한"
+        elif ai_saq_img_dto.difficulty == "EASY" : ai_saq_img_dto.difficulty = "쉬운"
+
+        problem_saq = {
+        "type": "object",
+        "properties": {
+            "problemName": {
+            "type": "string",
+            "description": "의문문 형식의 문제명"
+            },
+            "problemAnswer": {
+            "type": "string",
+            "description": "문제에 대한 정답"
+            },
+            "problemCommentary": {
+            "type": "string",
+            "description": "문제의 정답에 대한 해설"
+            },
+        },
+        "required": ["problemName", "problemAnswer", "problemCommentary"]
         }
 
-        print(json_response)
+        ai_saq_img_list =[]
 
-        return jsonify(json_response)
+       
+    
+
+        ocr_result_list = []
+        reader = easyocr.Reader(['ko','en'], gpu=False)
+        print("num of img")
+        print(len(ai_saq_img_dto.files))
+        print("ai_saq_img_dto.amount : "+ai_saq_img_dto.amount)
+        print("ai_saq_img_dto.difficulty  : "+ ai_saq_img_dto.difficulty)
+        for file in ai_saq_img_dto.files:
+            image = Image.open(BytesIO(file.read()))
+            image = np.array(image)
+            ocr_result = reader.readtext(image, detail=0)
+            result_merge = ' '.join(ocr_result)
+            ocr_result_list.append(result_merge)
+   
+        result_text = ' '.join(ocr_result_list) 
+         # 텍스트를 토큰 제한에 맞게 분리
+        text_chunks = split_token(result_text, MAX_TOKEN)
+
+        for i in range(len(text_chunks)):
+            prompt = "' " +text_chunks[i] + f"'의 내용기반으로 {ai_saq_img_dto.difficulty} 주관식 문제 만들어줘 "
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo-0613",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "너는 내용을 입력받으면 그 내용을 기반으로 주관식 문제를 만들어주는 시스템이야. 단 문제를 영어로 만들지 않고 한글로 문제를 만들어야 돼"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                functions=[{
+                    "name": "get_new_quiz",
+                    "description": "요청한 내용을 기반으로 문제 만들어줘 빈칸이 있으면 안돼",
+                    "parameters": problem_saq
+                }],
+                function_call={
+                    "name": "get_new_quiz"
+                },
+                # temperature= 1.1,
+                # top_p= 0.7,
+                # frequency_penalty= 1,
+                # presence_penalty= 0.8,
+                max_tokens= 1024
+                )
+            gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
+            ai_saq_img_list.append(AiResponseDto(problemName = gpt_response['problemName'], 
+                        problemAnswer = gpt_response['problemAnswer'],  problemCommentary = gpt_response['problemCommentary']))
+        
+        saq_json_response = [
+                    {
+                        "problemName": item.problemName,
+                        "problemAnswer": item.problemAnswer,
+                        "problemCommentary": item.problemCommentary
+                    }
+                    for item in ai_saq_img_list ]  
+        
+        return jsonify(saq_json_response)
+    except Exception as e:
+         return jsonify({"error": str(e)}), 400
+
+class AiSummaryJPGDto: #요점정리 input
+     def __init__(self, files, amount):
+         self.files = files
+         self.amount = amount
+
+
+@app.route('/create/summary/jpg', methods=['POST']) #이미지 요점정리
+def prompt6():
+    try:
+        amount_rq = request.form.get('amount')
+        img_files = request.files.getlist('files')
+        
+        ai_response_list = []
+        
+        summary_schema = {
+        "type": "object",
+        "properties": {
+            "summaryContent": {
+            "type": "string",
+            "description": "요점정리 내용"
+            }
+        },
+        "required": ["summaryContent"]
+        }
+
+
+        ai_img_summary_dto = AiSummaryJPGDto(
+            files=img_files,
+            amount=amount_rq
+        )
+        if  ai_img_summary_dto.amount == "MANY" : MAX_TOKEN = 400
+        elif  ai_img_summary_dto.amount== "MEDIUM" : MAX_TOKEN = 500
+        elif   ai_img_summary_dto.amount == "FEW" : MAX_TOKEN = 600
+
+        ocr_result_list = []
+        reader = easyocr.Reader(['ko','en'], gpu=False)
+        print("num of img")
+        print(len( ai_img_summary_dto.files))
+        print("ai_img_summary_dto.amount : " + ai_img_summary_dto.amount)
+
+        for file in  ai_img_summary_dto.files:
+            image = Image.open(BytesIO(file.read()))
+            image = np.array(image)
+            ocr_result = reader.readtext(image, detail=0)
+            result_merge = ' '.join(ocr_result)
+            ocr_result_list.append(result_merge)
+   
+        result_text = ' '.join(ocr_result_list) 
+
+        text_chunks = split_token(result_text, MAX_TOKEN)
+
+
+        for i in range(len(text_chunks)):
+            prompt = "' " +text_chunks[i] + f"'의 내용기반으로 요점 정리 해줘 "
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo-0613",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "너는 내용을 입력받으면 그 내용을 기반으로 요점정리를 만들어주는 시스템이야. 단 요점정리를 영어로 만들지 않고 한글로 만들어야 돼"
+                    },
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ],
+                functions=[{
+                    "name": "summary",
+                    "description": "요청한 내용을 기반으로 요점 정리해줘",
+                    "parameters": summary_schema
+                }],
+                function_call={
+                    "name": "summary"
+                },
+                # temperature= 1.1,
+                # top_p= 0.7,
+                # frequency_penalty= 1,
+                # presence_penalty= 0.8,
+                max_tokens= 1024
+                )
+            gpt_response = json.loads(response["choices"][0]["message"]["function_call"]["arguments"])
+            
+            gpt_response['summaryContent'] = ' '.join(gpt_response['summaryContent'].split('\n'))
+            ai_response_list.append(AiSummaryResponseDto(summaryContent = gpt_response['summaryContent']))
+
+            # Check the result
+            json_response = [
+                {
+                    "summaryContent": item.summaryContent
+                }
+                for item in ai_response_list
+            ]
+
+            merged_json = " ".join(item["summaryContent"] for item in json_response)
+            summary_jpg_result = {"summaryContent" : merged_json}
+        return jsonify(summary_jpg_result)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-    
-    
+
 
 if __name__ == '__main__':
     app.run(port=5000)
