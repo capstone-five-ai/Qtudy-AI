@@ -13,7 +13,7 @@ pip install tiktoken
 pip install Pillow
 pip install easyocr 
 pip install opencv-python
-
+pip install gunicorn
 
 
 
