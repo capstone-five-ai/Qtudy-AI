@@ -14,6 +14,7 @@ pip install Pillow
 pip install easyocr 
 pip install opencv-python
 pip install gunicorn
+pip install waitress
 
 
 
