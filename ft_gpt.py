@@ -337,14 +337,19 @@ def prompt3():
                 if tries > 3 and len(text_chunks) > break_count+1: 
                   break_count+= 1
                   tries = 0 
+        sum_summary_txt = ''
+        for i in range(len(ai_summary_response_list)):
+            sum_summary_txt += ai_summary_response_list[i].summaryContent
 
 
-        summary_json_response = [
-                {
-                    "summaryContent": item.summaryContent
-                }
-                for item in ai_summary_response_list
-            ]    
+        summary_json_response = [{ "summaryContent": sum_summary_txt}]
+
+        # summary_json_response = [
+        #         {
+        #             "summaryContent": item.summaryContent
+        #         }
+        #         for item in ai_summary_response_list
+        #     ]    
         return jsonify(summary_json_response)
 
     except Exception as e:
@@ -611,6 +616,7 @@ def prompt6():
                 count = break_count
                 for i in range(count,len(text_chunks)):
                     prompt = text_chunks[i]
+                    print(prompt)
                     break_count = i
                     summary_response = openai.ChatCompletion.create(
                         model="ft:gpt-3.5-turbo-0125:daewon-jaehyun:summary:9CPeuoZj",
@@ -642,12 +648,20 @@ def prompt6():
                 if tries > 3 and len(text_chunks) > break_count+1: 
                   break_count+= 1
                   tries = 0 
-        summary_json_response = [
-                {
-                    "summaryContent": item.summaryContent
-                }
-                for item in ai_summary_response_list
-            ]    
+                
+        sum_summary_txt = ''
+        for i in range(len(ai_summary_response_list)):
+            sum_summary_txt += ai_summary_response_list[i].summaryContent
+
+
+        summary_json_response = [{ "summaryContent": sum_summary_txt}]
+
+        # summary_json_response = [
+        #         {
+        #             "summaryContent": item.summaryContent
+        #         }
+        #         for item in ai_summary_response_list
+        #     ]    
         return jsonify(summary_json_response)
 
     except Exception as e:
