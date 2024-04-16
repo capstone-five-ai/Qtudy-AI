@@ -342,7 +342,7 @@ def prompt3():
             sum_summary_txt += ai_summary_response_list[i].summaryContent
 
 
-        summary_json_response = [{ "summaryContent": sum_summary_txt}]
+        summary_json_response = { "summaryContent": sum_summary_txt}
 
         # summary_json_response = [
         #         {
@@ -654,7 +654,7 @@ def prompt6():
             sum_summary_txt += ai_summary_response_list[i].summaryContent
 
 
-        summary_json_response = [{ "summaryContent": sum_summary_txt}]
+        summary_json_response = { "summaryContent": sum_summary_txt}
 
         # summary_json_response = [
         #         {
