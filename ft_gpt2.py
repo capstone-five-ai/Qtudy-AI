@@ -154,19 +154,19 @@ def prompt1():
                         max_tokens= 1024
                         )
                     
-                    mcq_result = mcq_response.choices[0]['message']['content']
-                    mcq_problemName = cleansing_token(re.search(r'문제명: (.*?) 선지:', mcq_result).group(1))
-                    choices = re.search(r'선지: (.*?) 해설:', mcq_result).group(1)
-                    mcq_problemCommentary = cleansing_token(re.search(r'해설: (.*?) 정답:', mcq_result).group(1))
-                    mcq_problemAnswer = cleansing_token(re.search(r'정답: (\d+)', mcq_result).group(1))           
-                    mcq_problemchoices = ast.literal_eval(choices)
-                    ai_mcq_response_list.append(AiResponseDto(problemName = mcq_problemName, problemChoices=mcq_problemchoices,
-                                problemAnswer = mcq_problemAnswer,  problemCommentary = mcq_problemCommentary))
-                    print(ai_mcq_response_list[-1].problemName)
-                    print(ai_mcq_response_list[-1].problemChoices)
-                    print(ai_mcq_response_list[-1].problemAnswer)
-                    print(ai_mcq_response_list[-1].problemCommentary)
-                    tries = 0 
+                        mcq_result = mcq_response.choices[0]['message']['content']
+                        mcq_problemName = cleansing_token(re.search(r'문제명: (.*?) 선지:', mcq_result).group(1))
+                        choices = re.search(r'선지: (.*?) 해설:', mcq_result).group(1)
+                        mcq_problemCommentary = cleansing_token(re.search(r'해설: (.*?) 정답:', mcq_result).group(1))
+                        mcq_problemAnswer = cleansing_token(re.search(r'정답: (\d+)', mcq_result).group(1))           
+                        mcq_problemchoices = ast.literal_eval(choices)
+                        ai_mcq_response_list.append(AiResponseDto(problemName = mcq_problemName, problemChoices=mcq_problemchoices,
+                                    problemAnswer = mcq_problemAnswer,  problemCommentary = mcq_problemCommentary))
+                        print(ai_mcq_response_list[-1].problemName)
+                        print(ai_mcq_response_list[-1].problemChoices)
+                        print(ai_mcq_response_list[-1].problemAnswer)
+                        print(ai_mcq_response_list[-1].problemCommentary)
+                        tries = 0 
                     success = True
                 except Exception:
                     tries += 1
