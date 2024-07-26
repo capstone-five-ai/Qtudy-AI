@@ -148,14 +148,14 @@ def prompt1():
         )
 
         if ai_mcq_problem_dto.difficulty == "HARD" : 
-            temperature_num = 0.1
-            top_p_num = 0.1
+            temperature_num = 0.3
+            top_p_num = 0.3
         elif ai_mcq_problem_dto.difficulty == "MODERATE" :
             temperature_num = 0.2
             top_p_num = 0.2
         elif ai_mcq_problem_dto.difficulty == "EASY" : 
-            temperature_num = 0.2
-            top_p_num = 0.2
+            temperature_num = 0.1
+            top_p_num = 0.1
 
         mcq_system_msg = "너는 입력 내용을 기반으로 n개의 객관식 문제를 만들어야 하는 시스템이야. 문제를 푸는 사람은 대학교 1학년 학생이야. 너의 임무는 다음과 같아. 임무1 선지는 중요한 학습 내용을 포함해야 한다. 임무2 선지마다 질문의 내용이 하나의 사실을 묻도록 해야 한다. 임무3 문제명과 선지가 간결하고 명확해야 한다. 임무4 명확한 오답 선지를 만들어야 한다. 임무5 각 선지의 내용이 상호 독립적이어야 한다. 임무6 각 선지의 형태를 유사하게 한다. 임무7 선지에 논리적 순서가 있으면 그 순서에 따라 배열한다. 임무8 선지의 개수는 반드시 4개이어야한다 임무9 자연스럽고 인간적인 방식으로 문제를 생성해 임무10 문제명을 생각하고 그에 대한 선지가 주제에 맞는지 생각하고 그에 대한 답과 해설을 만들어줘 너가 지켜야 할 객관식의 유형은 다음과 같아 유형1 단순히 어떤 문장들의 참·거짓을 판단하는 진위형 유형2 알맞은 것을 고르는 정답형 유형3 틀린 것을 고르는 부정형 문제 유형4 간단히 답을 제시하는 단답형과 완결형 위 임무와 객관식 유형을 반드시 지켜서 문제를 만들어주는게 너의 역할이야. 위 임무를 모두 지키면 200달러 팁을 줄꺼야. 지키지 못할 시 너에게 처벌을 줄꺼야."
         cleansing_text = cleansing_token(ai_mcq_problem_dto.text)
@@ -242,11 +242,11 @@ def prompt2():
         )
 
         if ai_saq_problem_dto.difficulty == "HARD" : 
-            temperature_num = 0.1
-            top_p_num = 0.1
+            temperature_num = 0.3
+            top_p_num = 0.3
         elif ai_saq_problem_dto.difficulty == "MODERATE" : 
-            temperature_num = 0.1
-            top_p_num = 0.1
+            temperature_num = 0.2
+            top_p_num = 0.2
         elif ai_saq_problem_dto.difficulty == "EASY" : 
             temperature_num = 0.1
             top_p_num = 0.1
@@ -356,8 +356,8 @@ def prompt3():
                                 "content": prompt
                             }
                         ],
-                        temperature= 0.4,
-                        top_p= 0.7,
+                        temperature= 0.2,
+                        top_p= 0.2,
                         # frequency_penalty= 1,
                         # presence_penalty= 0.8,
                         max_tokens= 1024
@@ -406,14 +406,14 @@ def prompt4():
     
 
         if ai_mcq_img_dto.difficulty == "HARD" : 
-            temperature_num = 0.1
-            top_p_num = 0.1
+            temperature_num = 0.3
+            top_p_num = 0.3
         elif ai_mcq_img_dto.difficulty == "MODERATE" :
             temperature_num = 0.2
             top_p_num = 0.2
         elif ai_mcq_img_dto.difficulty == "EASY" : 
-            temperature_num = 0.2
-            top_p_num = 0.2
+            temperature_num = 0.1
+            top_p_num = 0.1
 
         for file in ai_mcq_img_dto.files:
             image = Image.open(BytesIO(file.read()))
@@ -511,11 +511,11 @@ def prompt5():
              )
         
         if ai_saq_img_dto.difficulty == "HARD" : 
-            temperature_num = 0.1
-            top_p_num = 0.1
+            temperature_num = 0.3
+            top_p_num = 0.3
         elif ai_saq_img_dto.difficulty == "MODERATE" : 
-            temperature_num = 0.1
-            top_p_num = 0.1
+            temperature_num = 0.2
+            top_p_num = 0.2
         elif ai_saq_img_dto.difficulty == "EASY" : 
             temperature_num = 0.1
             top_p_num = 0.1
@@ -642,8 +642,8 @@ def prompt6():
                                 "content": prompt
                             }
                         ],
-                        temperature= 0.4,
-                        top_p= 0.7,
+                        temperature= 0.2,
+                        top_p= 0.2,
                         # frequency_penalty= 1,
                         # presence_penalty= 0.8,
                         max_tokens= 1024
