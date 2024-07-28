@@ -159,9 +159,11 @@ def prompt1():
 
         mcq_system_msg = "너는 입력 내용을 기반으로 n개의 객관식 문제를 만들어야 하는 시스템이야. 문제를 푸는 사람은 대학교 1학년 학생이야. 너의 임무는 다음과 같아. 임무1 선지는 중요한 학습 내용을 포함해야 한다. 임무2 선지마다 질문의 내용이 하나의 사실을 묻도록 해야 한다. 임무3 문제명과 선지가 간결하고 명확해야 한다. 임무4 명확한 오답 선지를 만들어야 한다. 임무5 각 선지의 내용이 상호 독립적이어야 한다. 임무6 각 선지의 형태를 유사하게 한다. 임무7 선지에 논리적 순서가 있으면 그 순서에 따라 배열한다. 임무8 선지의 개수는 반드시 4개이어야한다 임무9 자연스럽고 인간적인 방식으로 문제를 생성해 임무10 문제명을 생각하고 그에 대한 선지가 주제에 맞는지 생각하고 그에 대한 답과 해설을 만들어줘 너가 지켜야 할 객관식의 유형은 다음과 같아 유형1 단순히 어떤 문장들의 참·거짓을 판단하는 진위형 유형2 알맞은 것을 고르는 정답형 유형3 틀린 것을 고르는 부정형 문제 유형4 간단히 답을 제시하는 단답형과 완결형 위 임무와 객관식 유형을 반드시 지켜서 문제를 만들어주는게 너의 역할이야. 위 임무를 모두 지키면 200달러 팁을 줄꺼야. 지키지 못할 시 너에게 처벌을 줄꺼야."
         cleansing_text = cleansing_token(ai_mcq_problem_dto.text)
-        print(cleansing_text)
         text_chunks = split_tokenizer(cleansing_text, ai_mcq_problem_dto.amount)
         
+        if len(text_chunks[-1]) < 50:
+            text_chunks.pop()
+
 
         count= 0
         break_count = 0
@@ -172,8 +174,6 @@ def prompt1():
                 count = break_count
                 for i in range(count, len(text_chunks)):
                     prompt = text_chunks[i]
-                    print(prompt)
-                    
                     break_count = i
                     mcq_response = openai.ChatCompletion.create(
                         model="ft:gpt-3.5-turbo-0125:daewon-jaehyun:mcq2:9CTW4TU7",
@@ -195,7 +195,6 @@ def prompt1():
                         )
                     
                     mcq_result = mcq_response.choices[0]['message']['content']
-                    print( mcq_result)
                     mcq_problemName = cleansing_token(re.search(r'문제명: (.*?) 선지:', mcq_result).group(1))
                     choices = re.search(r'선지: (.*?) 해설:', mcq_result).group(1)
                     mcq_problemCommentary = cleansing_token(re.search(r'해설: (.*?) 정답:', mcq_result).group(1))
@@ -254,6 +253,9 @@ def prompt2():
         saq_system_msg = "너는 입력 내용을 기반으로 n개의 주관식 문제를 만들어야 하는 시스템이야. 문제를 푸는 사람은 대학교 1학년 학생이야. 너의 임무는 다음과 같아. 임무1 문제는 중요한 학습 내용을 포함해야 한다. 임무2 문제마다 질문의 내용이 하나의 사실을 묻도록 해야 한다. 임무3 문제는 간결하고 명확해야 한다. 임무4 각 문제의 내용이 상호 독립적이어야 한다. 임무5 각 문제의 형태를 유사하게 한다. 임무6 자연스럽고 인간적인 방식으로 문제를 생성해야 한다. 위 임무를 반드시 지켜서 문제를 만드는게 너의 역할이야. 위 임무를 모두 지키면 209달러 팁을 줄꺼야. 지키지 못할 시 너에게 처벌을 줄꺼야."
         cleansing_text = cleansing_token(ai_saq_problem_dto.text)
         text_chunks = split_tokenizer(cleansing_text, ai_saq_problem_dto.amount)
+        
+        if len(text_chunks[-1]) < 50:
+            text_chunks.pop()
         
         success = False
         count= 0
@@ -331,6 +333,9 @@ def prompt3():
         cleansing_text = cleansing_token(ai_summary_dto.text)
         text_chunks = split_tokenizer(cleansing_text, ai_summary_dto.amount)
         
+        if len(text_chunks[-1]) < 50:
+            text_chunks.pop()
+
         
         summary_system_msg = "너는 입력 내용을 기반으로 입력 내용의 요점을 정리하는 시스템이야. 너의 임무는 다음과 같아. 임무 1 입력 내용의 중요한 내용을 포함해야 한다. 임무 2 정리한 내용의 각 문장은 간결하고 명확해야 한다. 임무 3 자연스럽고 인간적인 방식으로 문장을 생성해야 한다. 위 임무를 반드시 지켜서 문제를 만드는게 너의 역할이야. 위 임무를 모두 지키면 200달러 팁을 줄거야. 지키지 못할 시 너에게 처벌을 줄거야."
     
@@ -430,6 +435,9 @@ def prompt4():
         cleansing_text = cleansing_token(result_text)
         text_chunks = split_tokenizer(cleansing_text, ai_mcq_img_dto.amount)
       
+        if len(text_chunks[-1]) < 50:
+            text_chunks.pop()
+        
         success = False
         count= 0
         break_count = 0
@@ -533,6 +541,9 @@ def prompt5():
         cleansing_text = cleansing_token(saq_ocr_result)
         text_chunks = split_tokenizer(cleansing_text, ai_saq_img_dto.amount)
 
+        if len(text_chunks[-1]) < 50:
+            text_chunks.pop()
+        
         success = False
         count= 0
         break_count = 0
@@ -617,6 +628,9 @@ def prompt6():
         cleansing_text = cleansing_token(summary_ocr_result)
         text_chunks = split_tokenizer(cleansing_text,ai_img_summary_dto.amount)
        
+        if len(text_chunks[-1]) < 50:
+            text_chunks.pop()
+        
         summary_system_msg = "너는 입력 내용을 기반으로 입력 내용의 요점을 정리하는 시스템이야. 너의 임무는 다음과 같아. 임무 1 입력 내용의 중요한 내용을 포함해야 한다. 임무 2 정리한 내용의 각 문장은 간결하고 명확해야 한다. 임무 3 자연스럽고 인간적인 방식으로 문장을 생성해야 한다. 위 임무를 반드시 지켜서 문제를 만드는게 너의 역할이야. 위 임무를 모두 지키면 200달러 팁을 줄거야. 지키지 못할 시 너에게 처벌을 줄거야."
         success = False
         count= 0
@@ -628,7 +642,6 @@ def prompt6():
                 count = break_count
                 for i in range(count,len(text_chunks)):
                     prompt = text_chunks[i]
-                    print(prompt)
                     break_count = i
                     summary_response = openai.ChatCompletion.create(
                         model="ft:gpt-3.5-turbo-0125:daewon-jaehyun:summary:9CPeuoZj",
